@@ -1,5 +1,5 @@
 # Knuckle Club
 
-A woodcut comic website with layered star ribbons, expressive motion, and a responsive layout.
+A responsive woodcut comic website with layered star ribbons and expressive motion.
 
-This is a fictional garage demonstration. Repair notes stay in the visitor's browser and are not sent to a business. The page is self-contained; fonts and artwork are embedded. Font notices are retained in the HTML.
+A fictional garage demonstration: repair notes stay in the visitor's browser. Website assets are served locally, without external font or image services. Font notices are retained in index.html.
