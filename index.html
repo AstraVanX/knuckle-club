@@ -534,8 +534,8 @@ html{scrollbar-color:var(--red) var(--paper)}
 <style id="knuckle-share-css">
 :root{--club-star-cursor:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2244%22%20height%3D%2244%22%20viewBox%3D%220%200%2044%2044%22%3E%3Cpath%20d%3D%22M22%202%20Q24%2018%2042%2022%20Q24%2024%2022%2042%20Q20%2024%202%2022%20Q20%2020%2022%202Z%22%20fill%3D%22%23f34b27%22%20stroke%3D%22%23f4e7cc%22%20stroke-width%3D%224%22%20stroke-linejoin%3D%22round%22%2F%3E%3Cpath%20d%3D%22M22%202%20Q24%2018%2042%2022%20Q24%2024%2022%2042%20Q20%2024%202%2022%20Q20%2020%2022%202Z%22%20fill%3D%22%23f34b27%22%20stroke%3D%22%23181815%22%20stroke-width%3D%221.5%22%20stroke-linejoin%3D%22round%22%2F%3E%3Ccircle%20cx%3D%2222%22%20cy%3D%2222%22%20r%3D%222%22%20fill%3D%22%23181815%22%2F%3E%3C%2Fsvg%3E") 22 22}
 /* The pointer is an actual native cursor: no lagging DOM twin or hidden hit target. */
-@media (hover:hover) and (pointer:fine) {
-  html, body, body * { cursor:var(--club-star-cursor),crosshair; }
+@media (hover:hover) and (pointer:fine) and (forced-colors:none) {
+  html, body, body *, .faq-list summary { cursor:var(--club-star-cursor),crosshair; }
   input:not([type=button]):not([type=submit]):not([type=checkbox]):not([type=radio]):not([type=date]),textarea,[contenteditable=true] { cursor:text; }
 }
 @media (forced-colors:active) {
@@ -630,7 +630,14 @@ html{scrollbar-color:var(--red) var(--paper)}
 }
 
 </style>
-<meta name="knuckle-edition" content="scroll-rhythm-06">
+<meta name="knuckle-edition" content="flow-and-cursor-07">
+<style id="knuckle-flow-css">
+/* Promote only the ribbons close to the viewport, not the whole page. */
+.kc-spread-stage{contain:paint}
+.kc-tape[data-kc-active="true"],
+.kc-tape[data-kc-active="true"] .kc-track,
+.kc-tape[data-kc-active="true"] .kc-star{will-change:transform}
+</style>
 </head>
 <body class="max-edition">
   <svg class="icon-defs" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs>
@@ -1591,7 +1598,7 @@ html{scrollbar-color:var(--red) var(--paper)}
       element, track: element.querySelector('.kc-track'),
       group: element.querySelector('.kc-group'),
       rate: Number(element.dataset.rate), period: 1, top: 0, height: 0,
-      angle: Number(element.dataset.angle), inSpread: spread.contains(element)
+      angle: Number(element.dataset.angle), inSpread: spread.contains(element), stars: [], active: false
     }));
     const edges = [...document.querySelectorAll('.kc-edge-star')];
     const pressStars = [...document.querySelectorAll('.kc-press-star')];
@@ -1616,6 +1623,7 @@ html{scrollbar-color:var(--red) var(--paper)}
         tape.height = bounds.height;
         const count = Math.ceil(tape.element.clientWidth / tape.period) + 3;
         while (tape.track.children.length < count) tape.track.append(tape.group.cloneNode(true));
+        tape.stars = [...tape.track.querySelectorAll(".kc-star")];
       });
       dirty = false;
     }
@@ -1625,11 +1633,20 @@ html{scrollbar-color:var(--red) var(--paper)}
       const fan = Math.sin(progress * Math.PI);
       const pull = reduced ? 0 : clamp((targetY - currentY) / 180, -1, 1);
       for (const tape of tapes) {
-        if (tape.top > targetY + height * 1.4 || tape.top + tape.height < targetY - height * .4) continue;
+        const near = tape.top <= targetY + height * 1.2 && tape.top + tape.height >= targetY - height * .2;
+        const promote = near && !reduced && !paused;
+        if (tape.active !== promote) {
+          tape.active = promote;
+          tape.element.dataset.kcActive = String(promote);
+        }
+        if (!near) continue;
         const distance = reduced ? 0 : (currentY - tape.top) * tape.rate;
         const x = -tape.period - modulo(distance + tape.period * .31, tape.period);
         tape.track.style.transform = `translate3d(${x.toFixed(3)}px,0,0)`;
-        tape.track.style.setProperty('--kc-star-turn', `${reduced ? 0 : (currentY * tape.rate * .17) % 360}deg`);
+        // A changing inherited variable invalidated the entire repeated text track.
+        // Keep the same star rotation, but update only the promoted glyphs.
+        const turn = `rotate(${reduced ? 0 : (currentY * tape.rate * .17) % 360}deg)`;
+        for (const star of tape.stars) star.style.transform = turn;
         const angle = tape.angle + (tape.inSpread ? (1 - fan) * -tape.angle * .55 : 0) + pull * (tape.rate > 0 ? .65 : -.65);
         tape.element.style.transform = reduced ? '' : `rotate(${angle.toFixed(3)}deg)`;
       }
@@ -1653,7 +1670,8 @@ html{scrollbar-color:var(--red) var(--paper)}
       frame = 0;
       if (disposed || paused || reduced) return;
       if (dirty) measure();
-      const dt = lastTime ? clamp(time - lastTime, 0, 48) : 16;
+      // Use elapsed time: a delayed frame must not create a many-frame catch-up tail.
+      const dt = lastTime ? Math.max(0, time - lastTime) : 16;
       lastTime = time;
       currentY += (targetY - currentY) * (1 - Math.exp(-dt / 135));
       if (Math.abs(targetY - currentY) < .07) currentY = targetY;
